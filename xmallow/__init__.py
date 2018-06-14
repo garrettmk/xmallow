@@ -1,5 +1,6 @@
 import re
 import types
+import itertools
 from lxml import etree
 
 
@@ -85,7 +86,8 @@ class XMLSchemaMeta(type):
         super().__init__(name, bases, dict_)
 
         fields = {name: field for name, field in cls.__dict__.items() if isinstance(field, Field)}
-        cls._fields = fields
+        base_fields = getattr(cls, '_fields', {})
+        cls._fields = {k: v for k, v in itertools.chain(base_fields.items(), fields.items())}
 
 
 class Schema(metaclass=XMLSchemaMeta):
