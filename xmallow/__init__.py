@@ -1,4 +1,5 @@
 import re
+import types
 from lxml import etree
 
 
@@ -28,6 +29,8 @@ class Field:
         """Extract data from a tag."""
         if isinstance(self.cast, (Field, Schema)):
             return self.cast.load(tag)
+        elif isinstance(self.cast, types.FunctionType):
+            return self.cast(tag)
         else:
             return self.cast(tag.text)
 
@@ -81,7 +84,7 @@ class XMLSchemaMeta(type):
     def __init__(cls, name, bases, dict_):
         super().__init__(name, bases, dict_)
 
-        fields = {name: field for name, field in dict_.items() if isinstance(field, Field)}
+        fields = {name: field for name, field in cls.__dict__.items() if isinstance(field, Field)}
         cls._fields = fields
 
 
