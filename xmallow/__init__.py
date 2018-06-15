@@ -130,14 +130,19 @@ class XMLSchemaMeta(type):
         base_fields = getattr(cls, '_fields', {})
         cls._fields = {k: v for k, v in itertools.chain(base_fields.items(), fields.items())}
 
+        cls.dict_type = dict_.get('dict_type', None) or getattr(cls, 'dict_type)')
+
 
 class Schema(metaclass=XMLSchemaMeta):
     """Utility class for working with XML responses."""
 
     _fields = {}
+    cull_none = False
+    dict_type = dict
 
-    def __init__(self, xml=None):
+    def __init__(self, xml=None, cull_none=False):
         self._tree = None
+        self._cull_none = self.cull_none or cull_none
         self.load(xml)
 
     def load(self, xml):
@@ -154,7 +159,11 @@ class Schema(metaclass=XMLSchemaMeta):
         for name, field in self._fields.items():
             data[name] = field.load(self._tree)
 
-        return self.post_load(data)
+        if self._cull_none:
+            data = {k: v for k, v in data.items() if v is not None}
+
+        data = self.post_load(data)
+        return self.dict_type(data)
 
     def post_load(self, data):
         return data
