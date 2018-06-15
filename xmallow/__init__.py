@@ -31,7 +31,7 @@ class Field:
 
     def __init__(self, path, cast=str, default=None, many=False, required=False):
         self.path = path
-        self.cast = cast
+        self.cast = getattr(self, 'cast', None) or cast
         self.default = default
         self.many = many
         self.required = required
