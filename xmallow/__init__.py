@@ -130,8 +130,6 @@ class XMLSchemaMeta(type):
         base_fields = getattr(cls, '_fields', {})
         cls._fields = {k: v for k, v in itertools.chain(base_fields.items(), fields.items())}
 
-        cls.dict_type = dict_.get('dict_type', None) or getattr(cls, 'dict_type)')
-
 
 class Schema(metaclass=XMLSchemaMeta):
     """Utility class for working with XML responses."""
