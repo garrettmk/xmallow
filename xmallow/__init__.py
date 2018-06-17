@@ -183,8 +183,18 @@ class Schema(metaclass=SchemaMeta):
     """Utility class for working with XML responses."""
 
     _fields = {}
+    context = {}
     dict_type = dict
     ignore_missing = False
+
+    def __init__(self, **kwargs):
+        super().__init__()
+
+        for key, value in kwargs.items():
+            if key in ('dict_type', 'ignore_missing', 'context'):
+                setattr(self, key, value)
+            else:
+                self.context.update(key=value)
 
     def load(self, xml):
         """Load data from an XML string or a Element."""
