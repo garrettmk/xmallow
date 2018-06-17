@@ -190,7 +190,6 @@ class Schema(metaclass=SchemaMeta):
 
         # If the argument is a string, parse it using lxml.etree.fromstring()
         else:
-            xml = remove_namespaces(xml)
             tree = etree.fromstring(xml)
 
         # Extract data using the schema's fields
