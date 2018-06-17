@@ -161,6 +161,11 @@ class DateTime(Field):
         raise NotImplementedError
 
 
+class List(Field):
+    """A list of values."""
+    many = True
+
+
 ########################################################################################################################
 
 
@@ -201,11 +206,13 @@ class Schema(metaclass=SchemaMeta):
                 data[name] = field.load(tree)
             except MissingFieldError as e:
                 # Note the use of "is True" below, this on purpose
-                if not ignore_missing or field.required is True:
+                if field.required is True or not ignore_missing:
                     raise e
 
         # Post-processing
         data = self.post_load(data)
+        if not isinstance(data, (self.dict_type, dict)):
+            raise TypeError(f'post_load() must return a dict or dict-like object, not {type(data)}')
 
         return data
 
