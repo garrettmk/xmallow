@@ -23,11 +23,12 @@ class MissingFieldError(XMallowError):
 class Field:
     """Basic field type."""
 
-    def __init__(self, path, cast=str, default=MissingFieldError, many=False):
+    def __init__(self, path, cast=str, default=MissingFieldError, many=False, required=None):
         self.path = path
         self.cast = getattr(self, 'cast', None) or cast
         self.default = default
         self.many = many
+        self.required = required
 
     def get_tags(self, root):
         """Return a list of tags selected by this field."""
@@ -62,16 +63,17 @@ class Field:
 
         # Handle the "no data" situation
         if not results:
+
+            # If default is a function, return it's return value
+            if callable(default):
+                return default()
+
             # Use raise if default is an instance or subclass of Exception
-            if isinstance(default, Exception):
+            elif isinstance(default, Exception):
                 raise default
 
             elif isinstance(default, type) and issubclass(default, Exception):
                 raise default(f'No results: {self.path}')
-
-            # If default is a function, return it's return value
-            elif callable(default):
-                return default()
 
             # Otherwise, return it as-is
             else:
@@ -98,6 +100,25 @@ class First(Field):
                 break
 
         return tags
+
+
+class Attribute(Field):
+    """Retrieves an attribute of an element."""
+
+    def __init__(self, *args, attr=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if attr is None:
+            raise ValueError(f'An attribute name is required.')
+        else:
+            self.attr = attr
+
+    def extract(self, tag):
+        attr = self.attr
+
+        if attr in tag.attrib:
+            return self.cast(tag.attrib.get(attr))
+        else:
+            raise MissingFieldError
 
 
 class Boolean(Field):
@@ -180,7 +201,8 @@ class Schema(metaclass=SchemaMeta):
             try:
                 data[name] = field.load(tree)
             except MissingFieldError as e:
-                if not ignore_missing:
+                # Note the use of "is True" below, this on purpose
+                if not ignore_missing or field.required is True:
                     raise e
 
         # Post-processing
