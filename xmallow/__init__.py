@@ -65,16 +65,16 @@ class Field:
         # Handle the "no data" situation
         if not results:
 
-            # If default is a function, return it's return value
-            if callable(default):
-                return default()
-
             # Use raise if default is an instance or subclass of Exception
-            elif isinstance(default, Exception):
+            if isinstance(default, Exception):
                 raise default
 
             elif isinstance(default, type) and issubclass(default, Exception):
                 raise default(f'No results: {self.path}')
+
+            # If default is a function, return it's return value
+            if callable(default):
+                return default()
 
             # Otherwise, return it as-is
             else:
