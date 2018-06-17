@@ -176,6 +176,14 @@ class List(Field):
     many = True
 
 
+class Nested(Field):
+    """A nested schema."""
+
+    def __init__(self, path, schema, **kwargs):
+        super().__init__(path, **kwargs)
+        self.cast = schema
+
+
 ########################################################################################################################
 
 
