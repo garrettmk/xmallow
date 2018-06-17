@@ -1,40 +1,33 @@
-import re
 import types
-import itertools
 from lxml import etree
 
 
 ########################################################################################################################
 
 
-def remove_namespaces(xml):
-    """Remove all traces of namespaces from the given XML string."""
-    re_ns_decl = re.compile(r' xmlns(:\w*)?="[^"]*"', re.IGNORECASE)
-    re_ns_open = re.compile(r'<\w+:')
-    re_ns_close = re.compile(r'/\w+:')
+class XMallowError(Exception):
+    pass
 
-    response = re_ns_decl.sub('', xml)  # Remove namespace declarations
-    response = re_ns_open.sub('<', response)  # Remove namespaces in opening tags
-    response = re_ns_close.sub('/', response)  # Remove namespaces in closing tags
-    return response
+
+class ValidationError(XMallowError):
+    pass
+
+
+class MissingFieldError(XMallowError):
+    pass
 
 
 ########################################################################################################################
 
 
-class ValidationError(Exception):
-    pass
-
-
 class Field:
     """Basic field type."""
 
-    def __init__(self, path, cast=str, default=None, many=False, required=False):
+    def __init__(self, path, cast=str, default=MissingFieldError, many=False):
         self.path = path
         self.cast = getattr(self, 'cast', None) or cast
         self.default = default
         self.many = many
-        self.required = required
 
     def get_tags(self, root):
         """Return a list of tags selected by this field."""
@@ -43,26 +36,44 @@ class Field:
 
     def extract(self, tag):
         """Extract data from a tag."""
-        if isinstance(self.cast, (Field, Schema)):
-            return self.cast.load(tag)
-        elif isinstance(self.cast, types.FunctionType):
-            return self.cast(tag)
+        cast = self.cast
+
+        # If our "type" is a Field or Schema, delegate to it's load() method. This allows nesting of Fields
+        # and Schemas
+        if isinstance(cast, (Field, Schema)):
+            return cast.load(tag)
+
+        # If our "type" is a function (not a callable), call that function with the tag as it's argument.
+        # This allows fields to access properties of the tag other than just its text.
+        elif isinstance(cast, types.FunctionType):
+            return cast(tag)
+
+        # Assume that self.cast is a primitive or a class, and pass it the tag's text as a value.
         else:
-            return self.cast(tag.text)
+            return cast(tag.text)
 
     def load(self, tag):
+        """Load data from an Element."""
+
+        # Get the tags for this field's xpath and extract data from them
         tags = self.get_tags(tag)
-        if not tags and self.required:
-            raise ValidationError(f'Required field is missing: {self.path}')
-
-        tags = tags if self.many else tags[:1]
         results = [self.extract(tag) for tag in tags]
+        default = self.default
 
+        # Handle the "no data" situation
         if not results:
-            return self.default() if callable(self.default) else self.default
+            if isinstance(default, Exception):
+                raise default(f'No results: {self.path}')
+            elif callable(default):
+                return default()
+            else:
+                return default
+
+        # If many=False, return only the first results
         elif not self.many:
             return results[0]
 
+        # Otherwise, the entire list
         return results
 
 
@@ -71,8 +82,10 @@ class First(Field):
 
     def get_tags(self, root):
         tags = []
+        xpath = root.xpath
+
         for path in self.path:
-            tags = root.xpath(path)
+            tags = xpath(path)
             if tags:
                 break
 
@@ -82,8 +95,8 @@ class First(Field):
 class Boolean(Field):
     """A field that casts to a Boolean value."""
 
-    truthy = ('1', 'true', 'yes')
-    falsy = ('0', 'false', 'no')
+    truthy = ('1', 'true', 'yes', 'Success', 'success', 'SUCCESS', 'ok')
+    falsy = ('0', 'false', 'no', 'Failure', 'failure', 'FAILURE', 'error')
 
     def extract(self, tag):
         text = tag.text
@@ -121,49 +134,55 @@ class DateTime(Field):
 ########################################################################################################################
 
 
-class XMLSchemaMeta(type):
+class SchemaMeta(type):
 
     def __init__(cls, name, bases, dict_):
         super().__init__(name, bases, dict_)
 
-        fields = {name: field for name, field in cls.__dict__.items() if isinstance(field, Field)}
-        base_fields = getattr(cls, '_fields', {})
-        cls._fields = {k: v for k, v in itertools.chain(base_fields.items(), fields.items())}
+        # Collect all the fields for this schema and its bases.
+        cls._fields = getattr(cls, '_fields', {})
+        cls._fields.update({name: field for name, field in cls.__dict__.items() if isinstance(field, Field)})
 
 
-class Schema(metaclass=XMLSchemaMeta):
+class Schema(metaclass=SchemaMeta):
     """Utility class for working with XML responses."""
 
     _fields = {}
-    cull_none = False
     dict_type = dict
+    ignore_missing = False
 
-    def __init__(self, xml=None, cull_none=False):
-        self._tree = None
-        self._cull_none = self.cull_none or cull_none
-        self.load(xml)
 
     def load(self, xml):
-        if xml is None:
-            self._tree = None
-            return {}
-        elif isinstance(xml, etree._Element):
-            self._tree = xml
+        """Load data from an XML string or a Element."""
+
+        # If the argument is a etree Element, use it as the tree root. This allows nesting of schemas
+        if isinstance(xml, etree._Element):
+            tree = xml
+
+        # If the argument is a string, parse it using lxml.etree.fromstring()
         else:
             xml = remove_namespaces(xml)
-            self._tree = etree.fromstring(xml)
+            tree = etree.fromstring(xml)
 
+        # Extract data using the schema's fields
         data = {}
+        ignore_missing = self.ignore_missing
+
         for name, field in self._fields.items():
-            data[name] = field.load(self._tree)
+            try:
+                data[name] = field.load(tree)
+            except MissingFieldError as e:
+                if not ignore_missing:
+                    raise e
 
-        if self._cull_none:
-            data = {k: v for k, v in data.items() if v is not None}
-
+        # Post-processing
         data = self.post_load(data)
-        return self.dict_type(data)
+        data = self.dict_type(data) if self.dict_type is not dict else data
+
+        return data
 
     def post_load(self, data):
+        """Process the data before converting to dict_type. Default implementation does nothing."""
         return data
 
 
