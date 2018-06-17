@@ -33,7 +33,6 @@ class Field:
 
     def get_tags(self, root):
         """Return a list of tags selected by this field."""
-        print(self.path)
         tags = root.xpath(self.path)
         return tags if self.many else tags[:1]
 
@@ -194,7 +193,7 @@ class Schema(metaclass=SchemaMeta):
             tree = etree.fromstring(xml)
 
         # Extract data using the schema's fields
-        data = {}
+        data = self.dict_type()
         ignore_missing = self.ignore_missing
 
         for name, field in self._fields.items():
@@ -207,7 +206,6 @@ class Schema(metaclass=SchemaMeta):
 
         # Post-processing
         data = self.post_load(data)
-        data = self.dict_type(data) if self.dict_type is not dict else data
 
         return data
 
