@@ -1,4 +1,5 @@
 import types
+import itertools
 from lxml import etree
 
 
@@ -169,11 +170,9 @@ class SchemaMeta(type):
     def __init__(cls, name, bases, dict_):
         super().__init__(name, bases, dict_)
 
-        # Collect all the fields for this schema and its bases.
-        base_fields = dict(getattr(cls, '_fields', {}))
-        this_fields = {name: field for name, field in cls.__dict__.items() if isinstance(field, Field)}
-        base_fields.update(this_fields)
-        cls._fields = this_fields
+        fields = {name: field for name, field in cls.__dict__.items() if isinstance(field, Field)}
+        base_fields = getattr(cls, '_fields', {})
+        cls._fields = {k: v for k, v in itertools.chain(base_fields.items(), fields.items())}
 
 
 class Schema(metaclass=SchemaMeta):
