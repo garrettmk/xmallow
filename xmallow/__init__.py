@@ -32,6 +32,7 @@ class Field:
 
     def get_tags(self, root):
         """Return a list of tags selected by this field."""
+        print(self.path)
         tags = root.xpath(self.path)
         return tags if self.many else tags[:1]
 
@@ -169,8 +170,10 @@ class SchemaMeta(type):
         super().__init__(name, bases, dict_)
 
         # Collect all the fields for this schema and its bases.
-        cls._fields = getattr(cls, '_fields', {})
-        cls._fields.update({name: field for name, field in cls.__dict__.items() if isinstance(field, Field)})
+        base_fields = dict(getattr(cls, '_fields', {}))
+        this_fields = {name: field for name, field in cls.__dict__.items() if isinstance(field, Field)}
+        base_fields.update(this_fields)
+        cls._fields = this_fields
 
 
 class Schema(metaclass=SchemaMeta):
