@@ -180,7 +180,6 @@ class Schema(metaclass=SchemaMeta):
     dict_type = dict
     ignore_missing = False
 
-
     def load(self, xml):
         """Load data from an XML string or a Element."""
 
