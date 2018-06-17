@@ -24,12 +24,22 @@ class MissingFieldError(XMallowError):
 class Field:
     """Basic field type."""
 
-    def __init__(self, path, cast=str, default=MissingFieldError, many=False, required=None):
+    cast = str
+    default = MissingFieldError
+    many = False
+    required = None
+    meta = {}
+
+    def __init__(self, path, **kwargs):
+        super().__init__()
+
         self.path = path
-        self.cast = getattr(self, 'cast', None) or cast
-        self.default = default
-        self.many = many
-        self.required = required
+
+        for key, value in kwargs.items():
+            if key in ('cast', 'default', 'many', 'required'):
+                setattr(self, key, value)
+            else:
+                self.meta.update(key=value)
 
     def get_tags(self, root):
         """Return a list of tags selected by this field."""
