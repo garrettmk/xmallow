@@ -30,13 +30,13 @@ class Field:
     required = None
     meta = {}
 
-    def __init__(self, path, **kwargs):
+    def __init__(self, path, cast=None, **kwargs):
         super().__init__()
-
         self.path = path
+        self.cast = self.cast if cast is None else cast
 
         for key, value in kwargs.items():
-            if key in ('cast', 'default', 'many', 'required'):
+            if key in ('default', 'many', 'required'):
                 setattr(self, key, value)
             else:
                 self.meta.update(key=value)
